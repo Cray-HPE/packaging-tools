@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+
+# Copyright 2020 Hewlett Packard Enterprise Development LP
+
+import asyncio
+import hashlib
+import io
+import logging
+import os
+import os.path
+import sys
+from urllib.parse import urljoin, urlparse
+
+import aiohttp
+import repomd
+import yaml
+
+LOGGER = logging.getLogger('rpm-sync')
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--destdir', metavar='DIR', help="Destination directory")
+    parser.add_argument('-n', metavar='INT', type=int, default=1, help="Number of assets to download at a time")
+    parser.add_argument('--scoped', action='store_true', default=False, help="Download assets to repository-specific directories")
+    parser.add_argument('--disable-cache', dest='cache_enabled', action='store_false', default=True, help="Always download, do not use cache")
+    parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity")
+    parser.add_argument('index', metavar='INDEX', type=argparse.FileType('r'), help="RPM index")
+    args = parser.parse_args()
+
+    if not args.destdir:
+        args.destdir = os.path.dirname(args.index.name)
+
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s\t%(levelname)s\t%(message)s",
+    )
+    log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+    LOGGER.setLevel(log_levels[min(len(log_levels)-1, args.verbose)])
+
+    index = yaml.safe_load(args.index)
+    if not index:
+        return
+
+    assets = [] # (location, digest, repourl, destdir)
+
+    for url, repo in index.items():
+        # Fix-up base URL, ensure trailing slash
+        url = url.rstrip(os.path.sep) + os.path.sep
+
+        if not repo.get('rpms'):
+            LOGGER.warning(f'Skipping {url}, no RPMs specified')
+            continue
+        LOGGER.info(f'Reading {url}')
+
+        # get destination directory
+        destdir = os.path.join(args.destdir, repo.get('dir', ''))
+        if args.scoped:
+            _url = urlparse(url)
+            destdir = os.path.join(destdir, _url.netloc, _url.path.lstrip(os.path.sep))
+
+        # Clean up RPMs
+        rpms = list(map(lambda x: x[:-4] if x.endswith('.rpm') else x, repo['rpms']))
+
+        # Load repo metadata
+        repo = repomd.load(url)
+
+        # Read package metadata
+        pkgs = {}
+        for el in repo._metadata.findall('common:package', namespaces=repomd._ns):
+            p = repomd.Package(el)
+            if p.nevra not in rpms:
+                continue
+            digest = p._element.findtext('common:checksum[@type="sha256"]', namespaces=repomd._ns)
+            pkgs[p.nevra] = (p.location, digest)
+
+        # Add each RPM to asset list
+        for name in rpms:
+            # Ensure no RPMs were missed
+            try:
+                location, digest = pkgs[name]
+            except KeyError:
+                LOGGER.error(f'{name} not found in {url}')
+                sys.exit(1)
+            assets.append((location, digest, repo.baseurl, destdir))
+
+    asyncio.run(sync(assets, args.n, args.cache_enabled))
+
+
+async def sync(assets, n=1, cache_enabled=True):
+    sem = asyncio.Semaphore(n)
+    async with aiohttp.ClientSession() as session:
+        for location, digest, repourl, destdir in assets:
+            url = urljoin(repourl, location)
+            path = os.path.join(destdir, location)
+
+            # Verify existing path
+            if cache_enabled and os.path.isfile(path) and digest and verify_digest(path, digest):
+                LOGGER.info(f'[cached] {path}')
+                continue
+
+            await sem.acquire()
+            asyncio.create_task(download_asset(sem, session, [url], path))
+
+        # wait for all tasks to finish
+        tasks = asyncio.all_tasks()
+        tasks.remove(asyncio.current_task())
+        if tasks:
+            await asyncio.gather(*tasks)
+
+
+def verify_digest(path, digest, bufsize=(1 << 16)):
+    m = hashlib.sha256()
+    with open(path, 'rb') as f:
+        while True:
+            chunk = f.read(bufsize)
+            if not chunk:
+                break
+            m.update(chunk)
+    return m.hexdigest() == digest
+
+
+async def download_asset(sem, session, urls, path):
+    """Download asset from one of the given `urls` to the specified `path`."""
+    try:
+        LOGGER.debug(f'downloading {path}')
+        # take first URL we can find
+        for url in urls:
+            async with session.get(url) as response:
+                # check response
+                if response.status >= 400:
+                    LOGGER.warning(f'[{response.status} {response.reason}] {url}')
+                    continue
+                LOGGER.info(f'[{response.status} {response.reason}] {url}')
+                # create directory
+                if not os.path.isdir(os.path.dirname(path)):
+                    os.makedirs(os.path.dirname(path))
+                # write asset file
+                with open(path, 'wb') as f:
+                    while True:
+                        chunk = await response.content.read(8192)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                print(path, file=sys.stdout, flush=True)
+                return
+    finally:
+        sem.release()
+    # no URLs were valid!
+    LOGGER.error(f'failed to download asset: {path}')
+    asyncio.get_running_loop().stop()
+
+
+if __name__ == "__main__":
+    main()
+

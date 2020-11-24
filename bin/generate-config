@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+
+import logging
+
+import yaml
+
+
+LOGGER = logging.getLogger()
+
+
+def run(func, iterable):
+    for idx, item in enumerate(iterable):
+        try:
+            name = item['name']
+        except KeyError:
+            LOGGER.error(f'document {idx}: missing required attribute: name')
+            return
+        try:
+            yield func(item)
+        except ValueError as e:
+            LOGGER.error(str(e))
+            return
+
+
+def blobstore(b):
+    soft_quota = b.setdefault('softQuota', None)
+    if soft_quota:
+        softQuota.setdefault('type', 'spaceRemainingQuota')
+        softQuota.setdefault('limit', 0)
+
+    if 'bucketConfiguration' in b:
+        # s3
+        conf = b['bucketConfiguration']
+
+        bucket - conf.setdefault('bucket', {})
+        if 'name' not in bucket:
+            raise ValueError(f'blob store {b["name"]}: missing required attribute: bucketConfiguration.bucket.name')
+        # region is ignored but needs to be set to an accepted value
+        bucket.setdefault('region', 'us-east-1')
+        bucket.setdefault('prefix', b['name'])
+        bucket.setdefault('expiration', 0)
+
+        if 'encryption' in conf:
+            enc = conf['encryption']
+            enc.setdefault('encryptionType', 's3ManagedEncryption')
+            # Optional and only valid for "kmsManagedEncryption" type
+            enc.setdefault('encryptionKey', None)
+
+        sec = conf.setdefault('bucketSecurity', {})
+        # Rely on nexus-blobstores-create to populate this based on the
+        # S3_ACCESS_KEY environment variable, mounted from a Secret
+        sec.setdefault('accessKeyId', None)
+        # Rely on nexus-blobstores-create to populate this based on the
+        # S3_SECRET_KEY environment variable, mounted from a Secret
+        sec.setdefault('secretAccessKey', None)
+        sec.setdefault('role', '')
+        sec.setdefault('sessionToken', '')
+
+        conn = conf.setdefault('advancedBucketConnection', {})
+        # Rely on nexus-blobstores-create to populate this based on the
+        # S3_ENDPOINT environment variable, mounted from a Secret
+        conn.setdefault('endpoint', None)
+        conn.setdefault('signerType', 'DEFAULT')
+        conn.setdefault('forcePathStyle', True)
+    else:
+        #file
+        b.setdefault('path', f'/nexus-data/blobs/{b["name"]}')
+
+    return b
+
+
+def repository(r):
+    try:
+        format_ = r['format']
+    except KeyError:
+        raise ValueError(f'repository {r["name"]}: missing required attribute: format')
+
+    try:
+        type_ = r['type']
+    except KeyError:
+        if 'remoteUrl' in r.get('proxy', {}):
+            type_ = r['type'] = 'proxy'
+        elif 'memberNames' in r.get('group', {}):
+            type_= r['type'] = 'group'
+        else:
+            type_= r['type'] = 'hosted'
+
+    r.setdefault('online', True)
+
+    storage = r.setdefault('storage', {})
+    storage.setdefault('blobStoreName', 'default')
+    storage.setdefault('strictContentTypeValidation', False)
+    if type_ == 'hosted':
+        storage.setdefault('writePolicy', 'ALLOW_ONCE')
+
+    if type_ in ('hosted', 'proxy'):
+        cleanup = r.setdefault('cleanup', None)
+        if cleanup:
+            cleanup.setdefault('policyNames', [])
+
+    if type_ == 'proxy':
+        proxy = r.setdefault('proxy', {})
+        if 'remoteUrl' not in proxy:
+            raise ValueError(f'repository {r["name"]}: missing required attribute: proxy.remoteUrl')
+        proxy.setdefault('contentMaxAge', 1440)
+        proxy.setdefault('metadataMaxAge', 5) # Nexus default: 1440
+
+        negative_cache = r.setdefault('negativeCache', {})
+        negative_cache.setdefault('enabled', False) # Nexus default: True
+        negative_cache.setdefault('timeToLive', 0) # Nexus default: 1440
+
+        http_client = r.setdefault('httpClient', {})
+        http_client.setdefault('blocked', False)
+        http_client.setdefault('autoBlock', False) # Nexus default: True
+
+        conn = http_client.setdefault('connection', None)
+        if conn:
+            conn.setdefault('retries', 0)
+            conn.setdefault('userAgentSuffix', None)
+            conn.setdefault('timeout', 60)
+            conn.setdefault('enableCircularRedirects', False)
+            conn.setdefault('enableCookies', False)
+
+        auth = http_client.setdefault('authentication', None)
+        if auth:
+            auth.setdefault('type', 'username')
+            auth.setdefault('username', None)
+            auth.setdefault('ntlmHost', None)
+            auth.setdefault('ntlmDomain', None)
+
+        r.setdefault('routingRule', None)
+
+    if type_ == 'group':
+        group = r.setdefault('group', {})
+        if 'memberNames' not in group:
+            raise ValueError(f'repository {r["name"]}: missing required attribute: group.memberNames')
+
+    if format_ == "docker":
+        docker = r.setdefault('docker', {})
+        docker.setdefault('v1Enabled', False)
+        docker.setdefault('forceBasicAuth', False) # Nexus default: True
+        docker.setdefault('httpPort', None) # Nexus default: 8082
+        docker.setdefault('httpsPort', None) # Nexus default: 8083
+        if type_ == 'proxy':
+            docker_proxy = r.setdefault('dockerProxy', {})
+            docker_proxy.setdefault('indexType', 'HUB')
+            docker_proxy.setdefault('indexUrl', None)
+
+    if format_ == 'yum' and type_ == 'hosted':
+        yum = r.setdefault('yum', {})
+        yum.setdefault('repodataDepth', 0) # Nexus default: 5
+        yum.setdefault('deployPolicy', 'STRICT')
+
+    return r
+
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+
+    FORMATTERS = {
+        'blobstore': blobstore,
+        'repository': repository,
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('type', choices=('blobstore', 'repository'))
+    parser.add_argument('-i', '--input', metavar='FILE', type=argparse.FileType('r'), default=sys.stdin)
+    parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w'), default=sys.stdout)
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO)
+
+    yaml.safe_dump_all(
+        run(FORMATTERS[args.type], yaml.safe_load_all(args.input)),
+        args.output,
+        default_flow_style=False,
+        explicit_start=True,
+    )

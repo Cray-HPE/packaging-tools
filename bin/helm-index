@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+
+# Copyright 2020 Hewlett Packard Enterprise Development LP
+
+
+from urllib.parse import urlparse
+
+import semver
+
+
+def is_devel_version(s):
+    version = semver.VersionInfo.parse(s)
+    return not (version.prerelease is None and version.build is None)
+
+
+def parse_nexus_index(nexus_index, index=None, devel=False):
+    if index is None:
+        index = {}
+    repos = {}
+
+    # Initialize index based on repositories
+    for repo in nexus_index['repositories']:
+        if repo['format'] != 'helm':
+            continue
+        if repo['type'] == 'group':
+            continue
+        if repo['type'] == 'proxy':
+            url = urlparse(repo['proxy']['remoteUrl'])
+        else:
+            url = urlparse(repo['url'])
+        url = url.geturl()
+        repos[repo['name']] = url
+        index[url] = {
+            #'url': url,
+            #'ca-file': None,
+            #'cert-file': None,
+            #'key-file': None,
+            #'password': None,
+            #'username': None,
+            'charts': {},
+        }
+
+    # Populate index based on components
+    for component in nexus_index['components']:
+        url = repos.get(component['repository'], None)
+        if not url:
+            continue
+        if not devel and is_devel_version(component['version']):
+            continue
+        versions = index[url]['charts'].setdefault(component['name'], [])
+        if component['version'] not in versions:
+            versions.append(component['version'])
+
+    return index
+
+
+def main():
+    import argparse
+    import json
+    import sys
+    import textwrap
+
+    import yaml
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent("""
+            Generates an index file for use with helm-sync of the form:
+
+                <url>:
+                  charts:
+                    <name>:
+                    - <version>
+                  ca-file: <ca-file>
+                  cert-file: <cert-file>
+                  key-file: <key-file>
+                  username: <username>
+                  password: <password>
+
+            Currently, only the "charts" field is populated.
+        """),
+    )
+    parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w+'), default=sys.stdout, help="Skopeo index of container images (default: stdout)")
+    parser.add_argument('--devel', action='store_true', default=False, help="Include development versions")
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, help="Verbose output")
+    parser.add_argument('input', metavar='FILE', nargs='*', type=argparse.FileType('r'), default=[sys.stdin], help='Nexus JSON index (default: stdin)')
+    args = parser.parse_args()
+
+    index = {}
+    for f in args.input:
+        parse_nexus_index(json.load(f), index, args.devel)
+
+    if not args.verbose:
+        # Remove empty repositories
+        empty = [k for k, v in index.items() if not v['charts']]
+        for k in empty:
+            del index[k]
+
+    if index or args.verbose:
+        yaml.safe_dump(index, stream=args.output)
+
+
+if __name__ == "__main__":
+    main()

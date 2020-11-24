@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+
+
+import os.path
+from urllib.parse import urlparse
+
+
+REPOS = {
+    'upstream-mirrors': [
+        # Mirror SLE 15sp1 Products
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Basesystem/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Basesystem-debug/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Containers/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Desktop-Applications/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Development-Tools/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-HPC/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Legacy/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Public-Cloud/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Python2/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Server-Applications/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Web-Scripting/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Product-HPC/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Product-SLES/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Product-WE/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/Storage/6/',
+        # Mirror SLE 15sp1 Updates
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-INSTALLER/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Basesystem/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Basesystem-debug/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Containers/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Desktop-Applications/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Development-Tools/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-HPC/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Legacy/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Public-Cloud/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Python2/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Server-Applications/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Web-Scripting/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Product-HPC/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Product-SLES/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Product-WE/',
+        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/Storage/6/',
+        # Mirror OpenSUSE 15
+        'http://car.dev.cray.com/artifactory/mirror-opensuse/external/',
+    ],
+
+    'shasta-1.3': [
+        # Mirrors
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/os/rpms/sles/15sp1-all/Products',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/os/rpms/sles/15sp1-all/Updates',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/os/rpms/opensuse/15/external',
+        # SMS Crayctldeploy
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/shasta-general/crayctldeploy/',
+        # COS
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/shasta-general/rpms/cray-sles15-sp1-cn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/shasta-general/rpms/cray-sles15-sp1-ncn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/shasta-general/rpms/third-party-sles15sp1-cn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/shasta-general/rpms/third-party-sles15sp1-ncn/',
+        # Firmware
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/shasta-firmware/shasta-firmware/',
+        # Badger
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/badger/badger/',
+        # SMA
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/sma/rpms/cray-sles15-sp1-cn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/sma/rpms/cray-sles15-sp1-ncn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-1.3/bloblets/sma/crayctldeploy/',
+    ],
+
+    'shasta-master': [
+        # Mirrors
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/os/rpms/sles/15sp1-all/Products',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/os/rpms/sles/15sp1-all/Updates',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/os/rpms/opensuse/15/external',
+        # SMS Crayctldeploy
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/shasta-general/crayctldeploy/',
+        # COS
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/shasta-general/rpms/cray-sles15-sp1-cn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/shasta-general/rpms/cray-sles15-sp1-ncn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/shasta-general/rpms/third-party-sles15sp1-cn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/shasta-general/rpms/third-party-sles15sp1-ncn/',
+        # Firmware
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/shasta-firmware/shasta-firmware/',
+        # Badger
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/badger/badger/',
+        # SMA
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/sma/rpms/cray-sles15-sp1-cn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/sma/rpms/cray-sles15-sp1-ncn/',
+        'http://dst.us.cray.com/dstrepo/shasta-cd-repo/bloblets/sma/crayctldeploy/',
+    ],
+}
+
+
+def urlpath(url):
+    _url = urlparse(url)pwd
+    return os.path.join(_url.netloc, _url.path.lstrip(os.path.sep))
+
+
+def main():
+    import argparse
+    from collections import defaultdict
+    import fileinput
+    from itertools import chain
+    import ssl
+    import sys
+    import urllib.request
+
+    import repomd
+    import yaml
+
+    parser = argparse.ArgumentParser(
+        description='Generate RPM index from a list of RPMs'
+    )
+    parser.add_argument('--cacert', metavar='FILE', dest='cacerts', action='append', default=[], help="Add trusted CA certificate")
+    parser.add_argument('-r', '--repo', metavar='URL', dest='repos', action='append', default=[], help="Add repository to search")
+    parser.add_argument('--enable-repos', metavar='GROUP', action='append', choices=list(REPOS.keys()), default=['shasta-1.3'], help="Enable repository group")
+    parser.add_argument('-s', '--search', action='store_true', default=False, help="Search RPM names")
+    parser.add_argument('--include-src', action='store_true', default=False, help="Search includes src RPMs")
+    parser.add_argument('rpms', metavar='FILE', nargs='*', help="List of RPMs (in NEVRA format)")
+    args = parser.parse_args()
+
+    # Initialize SSL context
+    context = ssl.create_default_context()
+    # Load trusted CAs
+    try:
+        import certifi
+    except ImportError:
+        pass
+    else:
+        context.load_verify_locations(certifi.where())
+    # Load specified certs
+    for cert in args.cacerts:
+        context.load_verify_locations(cert)
+    # Install opener with customized HTTPS handler
+    https_handler = urllib.request.HTTPSHandler(context=context,  check_hostname=True)
+    opener = urllib.request.build_opener(https_handler)
+    urllib.request.install_opener(opener)
+
+    # Enable repository groups
+    for group in args.enable_repos:
+        args.repos.extend(REPOS[group])
+
+    # Read in list of RPMs
+    rpms = set()
+    for line in fileinput.input(args.rpms):
+        rpm = line.strip()
+        if rpm.endswith('.rpm'):
+            rpm = rpm[:-4]
+        rpms.add(rpm)
+
+    # Initialize result structures
+    pkgs = defaultdict(set)
+    found = set()
+
+    # Search all repos for the rpms
+    for url in args.repos:
+        repo = repomd.load(url)
+        for el in repo._metadata.findall('common:package', namespaces=repomd._ns):
+            p = repomd.Package(el)
+            if p.nevra in rpms or (args.search and p.name in rpms and (p.arch != 'src' or args.include_src)):
+                pkgs[url].add(p.nevra)
+                found.add(p.nevra)
+                if args.search:
+                  found.add(p.name)
+
+    # Write manifest
+    if pkgs:
+        manifest = {url: {'dir': urlpath(url), 'rpms': list(sorted(rpms))} for url, rpms in pkgs.items()}
+        yaml.dump(manifest, stream=sys.stdout)
+
+    # Warn about missing RPMs
+    #found = set(chain.from_iterable(pkgs.values()))
+    missing = rpms.difference(found)
+    for rpm in missing:
+        print(f'error: not found: {rpm}', file=sys.stderr)
+
+
+
+if __name__ == '__main__':
+    main()

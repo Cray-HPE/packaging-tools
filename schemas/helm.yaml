@@ -1,0 +1,4 @@
+map(include('repo'), key=str())
+---
+repo:
+  charts: map(list(str()), key=str())

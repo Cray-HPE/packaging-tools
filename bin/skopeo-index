@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+
+# Copyright 2020 Hewlett Packard Enterprise Development LP
+
+from urllib.parse import urlparse
+
+
+def parse_nexus_index(nexus_index, index=None):
+    if index is None:
+        index = {}
+    repos = {}
+
+    # Initialize index based on repositories
+    for repo in nexus_index['repositories']:
+        if repo['format'] != 'docker':
+            continue
+        if repo['type'] == 'group':
+            continue
+        if repo['type'] == 'proxy':
+            url = urlparse(repo['proxy']['remoteUrl'])
+        else:
+            url = urlparse(repo['url'])
+            if repo['docker']['httpsPort']:
+                port = repo['docker']['httpsPort']
+                url = url._replace(scheme='https', netloc=f'{url.hostname}:{port}')
+            elif repo['docker']['httpPort']:
+                port = repo['docker']['httpPort']
+                url = url._replace(scheme='http', netloc=f'{url.hostname}:{port}')
+            else:
+                continue
+        repos[repo['name']] = url.netloc
+        if url.netloc not in index:
+            index[url.netloc] = {
+                'tls-verify': url.scheme == 'https',
+                'images': {},
+            }
+
+    # Populate index based on components
+    for component in nexus_index['components']:
+        netloc = repos.get(component['repository'], None)
+        if not netloc:
+            continue
+        versions = index[netloc]['images'].setdefault(component['name'], [])
+        if component['version'] not in versions:
+            versions.append(component['version'])
+
+    return index
+
+
+def main():
+    import argparse
+    import json
+    import sys
+    import textwrap
+
+    import yaml
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent("""
+            Generates an index file for use with "skopeo sync".
+
+                <registry>:
+                  images:
+                    <name>:
+                    - <version>
+                  credentials:
+                    username: <username>
+                    password: <password>
+                  tls-verify: true|false
+                  cert-dir: <cert-dir>
+
+            See https://github.com/containers/skopeo/blob/master/docs/skopeo-sync.1.md#yaml-file-content-used-source-for---src-yaml
+            for a more complete description of the index schema. Currently only "images"
+            and "tls-verify" fields are populated.
+        """),
+    )
+    parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w+'), default=sys.stdout, help="Skopeo index of container images (default: stdout)")
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, help="verbose output")
+    parser.add_argument('input', metavar='FILE', nargs='*', type=argparse.FileType('r'), default=[sys.stdin], help='Nexus JSON index (default: stdin)')
+    args = parser.parse_args()
+
+    index = {}
+    for f in args.input:
+        parse_nexus_index(json.load(f), index)
+
+    if not args.verbose:
+        # Remove empty repositories
+        empty = [k for k, v in index.items() if not v['images']]
+        for k in empty:
+            del index[k]
+
+    if index or args.verbose:
+        yaml.safe_dump(index, stream=args.output)
+
+
+if __name__ == "__main__":
+    main()

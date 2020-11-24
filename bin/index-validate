@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+
+import argparse
+from glob import iglob
+from os.path import basename, splitext
+import sys
+
+import yamale
+
+
+SCHEMAS = { splitext(basename(path))[0]: path for path in iglob("/usr/local/share/packaging-tools/schemas/*.yaml") }
+
+
+parser = argparse.ArgumentParser(description="Outputs the type of a specified index file")
+parser.add_argument('-t', '--type', action='append', choices=list(SCHEMAS.keys()), help="Index type")
+parser.add_argument('index', nargs='?', type=argparse.FileType('r'), default=sys.stdin, help="Index file")
+args = parser.parse_args()
+
+with args.index:
+    index = yamale.make_data(content=args.index.read())
+
+if args.type:
+    SCHEMAS = { name: path for name, path in SCHEMAS.items() if name in args.type }
+
+for name, path in SCHEMAS.items():
+    schema = yamale.make_schema(path)
+    try:
+        yamale.validate(schema, index)
+    except ValueError:
+        continue
+    print(name)
+    sys.exit(0)
+
+print("error: unknown index type", file=sys.stderr)
+sys.exit(1)

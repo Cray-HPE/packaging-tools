@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+# Copyright 2020 Hewlett Packard Enterprise Development LP
+
+from nexuscli import exception
+
+
+def main():
+    import argparse
+    import json
+    import sys
+
+    from nexuscli.nexus_config import NexusConfig
+    from nexuscli.nexus_client import NexusClient
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w+'), default=sys.stdout, help="Output file (default: stdout)")
+    parser.add_argument('-u', '--username', metavar='STR', default='admin', help='Nexus username (default: %(default)s)')
+    parser.add_argument('-p', '--password', metavar='STR', default='admin123', help='Nexus password (default: %(default)s)')
+    parser.add_argument('--x509-verify', action='store_true', default=False, help='Verify server certificate (default: %(default)s)')
+    parser.add_argument('url', nargs='?', metavar='URL', default='http://localhost:8081', help='Nexus URL (default: %(default)s)')
+
+    args = parser.parse_args()
+
+    config = NexusConfig(
+        username=args.username,
+        password=args.password,
+        url=args.url,
+        x509_verify=args.x509_verify,
+    )
+    client = NexusClient(config)
+    json.dump(create_index(client), args.output)
+
+
+def create_index(client):
+    index = {
+        'config': client.config.to_dict,
+        'repositories': get_repositories(client),
+        'components': [],
+    }
+    for repo in index['repositories']:
+        index['components'].extend(get_components(client, repo['name']))
+    return index
+
+
+def get_repositories(client):
+    response = client.http_get('/service/rest/beta/repositories')
+    if response.status_code != 200:
+        raise exception.NexusClientAPIError(response.content)
+    return response.json()
+
+
+def get_components(client, repository_name):
+    query = {'repository': repository_name}
+    yield from client._get_paginated('/service/rest/v1/components', params=query)
+
+
+def get_assets(client, repository_name):
+    query = {'repository': repository_name}
+    yield from client._get_paginated('/service/rest/v1/assets', params=query)
+
+
+
+if __name__ == "__main__":
+    main()

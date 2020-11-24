@@ -1,0 +1,5 @@
+map(include('registry'), key=str())
+---
+registry:
+  images: map(list(str()), key=str())
+  tls-verify: bool(required=False)

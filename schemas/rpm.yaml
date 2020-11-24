@@ -1,0 +1,6 @@
+map(include('repos'), key=str())
+---
+repos:
+  sync: bool()
+  dir: str()
+  rpms: list(str(), required=False)
