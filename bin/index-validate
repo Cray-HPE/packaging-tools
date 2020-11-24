@@ -8,7 +8,7 @@ import sys
 import yamale
 
 
-SCHEMAS = { splitext(basename(path))[0]: path for path in iglob("/usr/local/share/packaging-tools/schemas/*.yaml") }
+SCHEMAS = { splitext(basename(path))[0]: path for path in iglob("/usr/src/packaging-tools/schemas/*.yaml") }
 
 
 parser = argparse.ArgumentParser(description="Outputs the type of a specified index file")

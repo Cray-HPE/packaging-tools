@@ -7,5 +7,5 @@ dockerBuildPipeline {
   name = "packaging-tools"
   description = "Utilities for packaging release distributions"
   repository = "cray"
-  product = "shasta-standard,shasta-premium"
+  product = "internal"
 }
