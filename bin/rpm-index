@@ -91,7 +91,7 @@ REPOS = {
 
 
 def urlpath(url):
-    _url = urlparse(url)pwd
+    _url = urlparse(url)
     return os.path.join(_url.netloc, _url.path.lstrip(os.path.sep))
 
 
