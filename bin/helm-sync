@@ -84,7 +84,7 @@ async def sync_repo(sem, session, repo, destdir, cache_enabled=True):
         if chart_name not in repo['index']['entries']:
             LOGGER.error(f'index missing {chart_name} chart: {index_url}')
             any_errors = True
-            #asyncio.get_running_loop().stop()
+            continue
 
         # Filter index to get available versions of chart
         available_versions = {i['version']: i for i in repo['index']['entries'][chart_name] if i['version'] in chart_versions}
@@ -95,7 +95,7 @@ async def sync_repo(sem, session, repo, destdir, cache_enabled=True):
             except KeyError:
                 LOGGER.error(f'index missing {chart_name} version {version}: {index_url}')
                 any_errors = True
-                #asyncio.get_running_loop().stop()
+                continue
 
             path = os.path.join(destdir, f'{chart_name}-{version}.tgz')
 
@@ -104,12 +104,12 @@ async def sync_repo(sem, session, repo, destdir, cache_enabled=True):
                 LOGGER.info(f'[cached] {path}')
                 continue
 
-            charts.append([urljoin(repo['url'], url) for url in metadata['urls']])
+            charts.append(([urljoin(repo['url'], url) for url in metadata['urls']], path))
 
     if any_errors:
         asyncio.get_running_loop().stop()
 
-    for urls in charts:
+    for urls, path in charts:
         # Download chart
         await sem.acquire()
         asyncio.create_task(download_chart(sem, session, urls, path))
