@@ -106,7 +106,7 @@ async def sync_repo(sem, session, repo, destdir, cache_enabled=True):
 
             charts.append([urljoin(repo['url'], url) for url in metadata['urls']])
 
-    if not any_errors:
+    if any_errors:
         asyncio.get_running_loop().stop()
 
     for urls in charts:
