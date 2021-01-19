@@ -12,109 +12,6 @@ import os.path
 from urllib.parse import urlparse
 
 
-REPOS = OrderedDict((
-    ('cos-master', [
-        'http://car.dev.cray.com/artifactory/cos/DVS/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/cos/LUS/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/cos/SHASTA-3RD/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/cos/SHASTA-KERNEL/sle15_sp2_cn/noarch/dev/master/',
-        'http://car.dev.cray.com/artifactory/cos/SHASTA-KERNEL/sle15_sp2_cn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/cos/SHASTA-OS/sle15_sp2_ncn/noarch/dev/master/',
-        'http://car.dev.cray.com/artifactory/cos/SHASTA-OS/sle15_sp2_ncn/x86_64/dev/master/',
-    ]),
-    ('csm-master', [
-        'http://car.dev.cray.com/artifactory/csm/CDS/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/CLOUD/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/CSM/sle15_sp2_ncn/noarch/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/MTL/sle15_sp2_ncn/noarch/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/MTL/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/SCMS/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/SPET/sle15_sp2_ncn/noarch/dev/master/',
-        'http://car.dev.cray.com/artifactory/csm/UAS/sle15_sp2_ncn/x86_64/dev/master/',
-    ]),
-    ('sat-master', [
-        'http://car.dev.cray.com/artifactory/sat/SAT/sle15_sp2_ncn/x86_64/dev/master/',
-    ]),
-    ('slingshot-master', [
-        'http://car.dev.cray.com/artifactory/slingshot/OFI-CRAY/sle15_sp2_cn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/slingshot/OFI-CRAY/sle15_sp2_ncn/x86_64/dev/master/',
-        'http://car.dev.cray.com/artifactory/slingshot/SSHOT/sle15_sp2_ncn/x86_64/dev/master/',
-    ]),
-    ('sle-15sp2', [
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Basesystem/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Containers/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Desktop-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Development-Tools/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Legacy/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Public-Cloud/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Python2/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Server-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Module-Web-Scripting/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Product-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Product-SLES/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/SLE-Product-WE/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/Storage/7/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Updates/Storage/6/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Basesystem/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Containers/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Desktop-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Development-Tools/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Legacy/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Public-Cloud/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Python2/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Server-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Module-Web-Scripting/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Product-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Product-SLES/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/SLE-Product-WE/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/Storage/7/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Products/Storage/6/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp2/Backports/SLE-15-SP2_x86_64/standard/',
-    ]),
-    ('sle-15sp1', [
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Basesystem/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Containers/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Desktop-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Development-Tools/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Legacy/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Public-Cloud/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Python2/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Server-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Module-Web-Scripting/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Product-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Product-SLES/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/SLE-Product-WE/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/Storage/7/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Updates/Storage/6/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Basesystem/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Containers/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Desktop-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Development-Tools/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Legacy/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Public-Cloud/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Python2/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Server-Applications/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Module-Web-Scripting/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Product-HPC/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Product-SLES/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/SLE-Product-WE/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/Storage/7/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Products/Storage/6/',
-        'http://car.dev.cray.com/artifactory/mirror-sles15sp1/Backports/SLE-15-SP1_x86_64/standard/',
-    ]),
-    ('opensuse', [
-        'http://car.dev.cray.com/artifactory/mirror-opensuse/external/',
-    ]),
-    ('kubernetes', [
-        'https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64',
-    ]),
-))
-
-
 def main():
     import argparse
     from collections import defaultdict
@@ -134,8 +31,8 @@ def main():
         description='Generate RPM index from a list of RPMs'
     )
     parser.add_argument('--cacert', metavar='FILE', dest='cacerts', action='append', default=[], help="Add trusted CA certificate")
-    parser.add_argument('-r', '--repo', metavar='URL', dest='repos', action='append', default=[], help="Add repository to search list")
-    parser.add_argument('-g', '--repo-group', metavar='GROUP', action='append', choices=list(REPOS.keys()), default=[], help="Add group of repositories to search list")
+    parser.add_argument('-r', '--repo', metavar='URL', dest='repos', nargs=1, action='append', default=[], help="Add repository to search list")
+    parser.add_argument('-d', '--repodir', metavar='URL DIR', dest='repos', nargs=2, action='append', default=[], help="Add repository to search list with output directory")
     parser.add_argument('-a', '--all', action='store_true', default=False, help="Find RPMs in all repositories")
     parser.add_argument('-s', '--search', action='store_true', default=False, help="Search RPM names")
     parser.add_argument('--include-src', action='store_true', default=False, help="Search includes src RPMs")
@@ -167,14 +64,13 @@ def main():
     opener = urllib.request.build_opener(https_handler)
     urllib.request.install_opener(opener)
 
-    # Enable repository groups
-    if not args.repo_group and not args.repos:
-        args.repo_group = list(REPOS.keys())
-    for group in args.repo_group:
-        args.repos.extend(REPOS[group])
+    # Repository output directories default to the current directory
+    for item in args.repos:
+        if len(item) < 2:
+            item.append('.')
 
     # Deduplicate repos list while preserving order
-    args.repos = list(OrderedDict.fromkeys(args.repos))
+    args.repos = OrderedDict(args.repos)
 
     # Read in list of RPMs
     rpms = set()
@@ -189,7 +85,7 @@ def main():
     found = set()
 
     # Search all repos for the rpms
-    for url in args.repos:
+    for url in args.repos.keys():
         LOGGER.info(f'Searching {url}')
         repo = repomd.load(url)
         for el in repo._metadata.findall('common:package', namespaces=repomd._ns):
@@ -203,7 +99,7 @@ def main():
 
     # Write manifest
     if pkgs:
-        manifest = {url: {'rpms': list(sorted(rpms))} for url, rpms in pkgs.items()}
+        manifest = {url: {'dir': args.repos[url], 'rpms': list(sorted(rpms))} for url, rpms in pkgs.items()}
         yaml.dump(manifest, stream=sys.stdout)
 
     # Warn about missing RPMs
