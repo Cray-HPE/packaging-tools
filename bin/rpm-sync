@@ -3,12 +3,14 @@
 # Copyright 2020 Hewlett Packard Enterprise Development LP
 
 import asyncio
+from email.utils import parsedate_tz, mktime_tz
 import hashlib
 import io
 import logging
 import os
 import os.path
 import sys
+from time import time
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -144,6 +146,10 @@ async def download_asset(sem, session, urls, path):
                         if not chunk:
                             break
                         f.write(chunk)
+                # set file last modified time
+                modified = response.headers.get('last-modified')
+                if modified:
+                    os.utime(path, (time(), mktime_tz(parsedate_tz(modified))))
                 print(path, file=sys.stdout, flush=True)
                 return
     finally:
