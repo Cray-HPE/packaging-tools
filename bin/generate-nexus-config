@@ -138,7 +138,7 @@ def repository(r):
     if format_ == "docker":
         docker = r.setdefault('docker', {})
         docker.setdefault('v1Enabled', False)
-        docker.setdefault('forceBasicAuth', False) # Nexus default: True
+        docker.setdefault('forceBasicAuth', True)
         docker.setdefault('httpPort', None) # Nexus default: 8082
         docker.setdefault('httpsPort', None) # Nexus default: 8083
         if type_ == 'proxy':
