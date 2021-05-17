@@ -2,7 +2,6 @@ aiohttp[speedups]
 certifi
 nexus3-cli
 pyyaml
-pyyaml
 repomd==0.2.1
 semver
 yamale>=3.0
