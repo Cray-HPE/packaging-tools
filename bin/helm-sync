@@ -28,7 +28,7 @@ def main():
     parser.add_argument('--dry-run', action='store_true', default=False, help="Verify charts exist in repository but do not download")
     parser.add_argument('-v', '--verbose', action='count', default=0, help="Verbosity")
     parser.add_argument('index', metavar='INDEX', type=argparse.FileType('r'), help="Chart index")
-    parser.add_argument('destdir', metavar='DIR', nargs='?', default=os.getcwd(), help="Destination directory")
+    parser.add_argument('destdir', metavar='DIR', nargs='?', default='', help="Destination directory")
     args = parser.parse_args()
 
     logging.basicConfig(
