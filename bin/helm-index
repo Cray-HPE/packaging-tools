@@ -8,6 +8,9 @@ from urllib.parse import urlparse
 import semver
 
 
+DEFAULT_HELM_REPO = 'https://arti.dev.cray.com/artifactory/csm-helm-stable-local/'
+
+
 def is_devel_version(s):
     version = semver.VersionInfo.parse(s)
     return not (version.prerelease is None and version.build is None)
@@ -54,10 +57,23 @@ def parse_nexus_index(nexus_index, index=None, devel=False):
     return index
 
 
+def parse_loftsman_manifest(manifest, index=None, default_repo=None):
+    if index is None:
+        index = {}
+    spec = manifest.get('spec', {})
+    # Create mapping of chart sources
+    sources = {c['name']: c['location'] for c in spec.get('sources', {}).get('charts', []) if c.get('type', '') == 'repo'}
+    # Add each chart version to the index
+    for c in spec.get('charts', []):
+        versions = index.setdefault(sources.get(c.get('source', None), default_repo), {'charts': {}})['charts'].setdefault(c['name'], [])
+        if c['version'] not in versions:
+            versions.append(c['version'])
+    return index
+
+
 def main():
     import argparse
     import json
-    import sys
     import textwrap
 
     import yaml
@@ -80,24 +96,33 @@ def main():
             Currently, only the "charts" field is populated.
         """),
     )
-    parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w+'), default=sys.stdout, help="Skopeo index of container images (default: stdout)")
-    parser.add_argument('--devel', action='store_true', default=False, help="Include development versions")
-    parser.add_argument('-v', '--verbose', action='store_true', default=False, help="Verbose output")
-    parser.add_argument('input', metavar='FILE', nargs='*', type=argparse.FileType('r'), default=[sys.stdin], help='Nexus JSON index (default: stdin)')
+    parser.add_argument('-i', '--index', metavar='FILE', type=argparse.FileType('r'), help="Helm chart index")
+    parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w+'), default='-', help="Skopeo index of container images (default: stdout)")
+    parser.add_argument('-r', '--default-repo', default=DEFAULT_HELM_REPO, help="Default Helm repository URL")
+    parser.add_argument('--nexus', metavar='FILE', action='append', type=argparse.FileType('r'), help='Nexus JSON index')
+    parser.add_argument('--devel', action='store_true', default=False, help="Include development versions from Nexus JSON index")
+    parser.add_argument('manifests', metavar='MANIFEST', nargs='*', type=argparse.FileType('r'), default='-', help="Loftsman manifest")
     args = parser.parse_args()
 
-    index = {}
-    for f in args.input:
-        parse_nexus_index(json.load(f), index, args.devel)
+    if args.index:
+        index = yaml.safe_load(args.index)
+    else:
+        index = {}
 
-    if not args.verbose:
-        # Remove empty repositories
-        empty = [k for k, v in index.items() if not v['charts']]
-        for k in empty:
-            del index[k]
+    if args.nexus:
+        for f in args.nexus:
+            parse_nexus_index(json.load(f), index, args.devel)
 
-    if index or args.verbose:
-        yaml.safe_dump(index, stream=args.output)
+    for f in args.manifests:
+        parse_loftsman_manifest(yaml.safe_load(f), index, args.default_repo)
+
+    # Remove empty repositories
+    empty = [k for k, v in index.items() if not v['charts']]
+    for k in empty:
+        del index[k]
+
+    if index:
+        yaml.safe_dump(index, args.output)
 
 
 if __name__ == "__main__":
