@@ -8,9 +8,6 @@ from urllib.parse import urlparse
 import semver
 
 
-DEFAULT_HELM_REPO = 'https://arti.dev.cray.com/artifactory/csm-helm-stable-local/'
-
-
 def is_devel_version(s):
     version = semver.VersionInfo.parse(s)
     return not (version.prerelease is None and version.build is None)
@@ -98,7 +95,7 @@ def main():
     )
     parser.add_argument('-i', '--index', metavar='FILE', type=argparse.FileType('r'), help="Helm chart index")
     parser.add_argument('-o', '--output', metavar='FILE', type=argparse.FileType('w+'), default='-', help="Skopeo index of container images (default: stdout)")
-    parser.add_argument('-r', '--default-repo', default=DEFAULT_HELM_REPO, help="Default Helm repository URL")
+    parser.add_argument('-r', '--default-repo', default='http://helmrepo.dev.cray.com:8080/', help="Default Helm repository URL")
     parser.add_argument('--nexus', metavar='FILE', action='append', type=argparse.FileType('r'), help='Nexus JSON index')
     parser.add_argument('--devel', action='store_true', default=False, help="Include development versions from Nexus JSON index")
     parser.add_argument('manifests', metavar='MANIFEST', nargs='*', type=argparse.FileType('r'), default='-', help="Loftsman manifest")
