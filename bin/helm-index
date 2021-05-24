@@ -114,7 +114,7 @@ def main():
         parse_loftsman_manifest(yaml.safe_load(f), index, args.default_repo)
 
     # Remove empty repositories
-    empty = [k for k, v in index.items() if not v['charts']]
+    empty = [k for k, v in index.items() if not v.get('charts')]
     for k in empty:
         del index[k]
 
