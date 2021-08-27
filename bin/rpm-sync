@@ -5,7 +5,6 @@
 import asyncio
 from email.utils import parsedate_tz, mktime_tz
 import hashlib
-import io
 import logging
 import os
 import os.path
@@ -49,23 +48,17 @@ def main():
 
     assets = [] # (location, digest, repourl, destdir)
 
-    for url, repo in index.items():
+    for url, spec in index.items():
         # Fix-up base URL, ensure trailing slash
         url = url.rstrip(os.path.sep) + os.path.sep
 
-        if not repo.get('rpms'):
+        if not spec.get('rpms'):
             LOGGER.warning(f'Skipping {url}, no RPMs specified')
             continue
         LOGGER.info(f'Reading {url}')
 
-        # get destination directory
-        destdir = os.path.join(args.destdir, repo.get('dir', ''))
-        if args.scoped:
-            _url = urlparse(url)
-            destdir = os.path.join(destdir, _url.netloc, _url.path.lstrip(os.path.sep))
-
         # Clean up RPMs
-        rpms = list(map(lambda x: x[:-4] if x.endswith('.rpm') else x, repo['rpms']))
+        rpms = list(map(lambda x: x[:-4] if x.endswith('.rpm') else x, spec['rpms']))
 
         # Load repo metadata
         repo = repomd.load(url)
@@ -76,18 +69,31 @@ def main():
             p = repomd.Package(el)
             if p.nevra not in rpms:
                 continue
+
+            # Source URL
+            srcurl = urljoin(repo.baseurl, p.location)
+
+            # Destination path
+            if args.scoped:
+                _url = urlparse(srcurl)
+                destpath = os.path.join(args.destdir, _url.netloc, _url.path.lstrip(os.path.sep))
+            else:
+                destpath = os.path.join(args.destdir, spec.get('dir', '{arch}').format(arch=p.arch), os.path.basename(p.location))
+
+            # SHA256 digest
             digest = p._element.findtext('common:checksum[@type="sha256"]', namespaces=repomd._ns)
-            pkgs[p.nevra] = (p.location, digest)
+
+            # Save source, destination, and digest
+            pkgs[p.nevra] = (srcurl, destpath, digest)
 
         # Add each RPM to asset list
         for name in rpms:
             # Ensure no RPMs were missed
             try:
-                location, digest = pkgs[name]
+                assets.append(pkgs[name])
             except KeyError:
-                LOGGER.error(f'{name} not found in {url}')
+                LOGGER.error(f'{name} not found in repo at {url}')
                 sys.exit(1)
-            assets.append((location, digest, repo.baseurl, destdir))
 
     asyncio.run(sync(assets, args.n, args.cache_enabled, args.dry_run))
 
@@ -95,10 +101,7 @@ def main():
 async def sync(assets, n=1, cache_enabled=True, dry_run=False):
     sem = asyncio.Semaphore(n)
     async with aiohttp.ClientSession() as session:
-        for location, digest, repourl, destdir in assets:
-            url = urljoin(repourl, location)
-            path = os.path.join(destdir, location)
-
+        for url, path, digest in assets:
             # Verify existing path
             if cache_enabled and os.path.isfile(path) and digest and verify_digest(path, digest):
                 LOGGER.info(f'[cached] {path}')
