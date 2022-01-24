@@ -8,4 +8,5 @@ dockerBuildPipeline {
   description = "Utilities for packaging release distributions"
   repository = "cray"
   product = "internal"
+  cronTrigger = "@weekly"
 }
